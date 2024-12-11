@@ -16,6 +16,7 @@ const (
 	ConfigPath  = "config.yaml"
 	HistoryPath = "history.yaml"
 	Language    = "zh-CN"
+	Apikey      = ""
 	PingUrl     = "https://ysboke.cn/api/kingTool/ping"
 )
 

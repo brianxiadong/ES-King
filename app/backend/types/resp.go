@@ -9,6 +9,7 @@ type Config struct {
 	Height   int       `json:"height"`
 	Language string    `json:"language"`
 	Theme    string    `json:"theme"`
+	Apikey   string    `json:"apikey"`
 	Connects []Connect `json:"connects"`
 }
 type History struct {

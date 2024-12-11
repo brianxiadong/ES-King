@@ -12,6 +12,7 @@
       <n-button @click="exportJson" :render-icon="renderIcon(ArrowDownwardOutlined)">导出结果</n-button>
       <n-button @click="showDrawer = true" :render-icon="renderIcon(MenuBookTwotone)">ES查询示例</n-button>
       <n-button @click="showHistoryDrawer = true" :render-icon="renderIcon(HistoryOutlined)">历史记录</n-button>
+      <n-button @click="showBigModel = true" :render-icon="renderIcon(HikingSharp)">大模型</n-button>
     </n-flex>
     <n-grid x-gap="20" :cols="2">
       <n-grid-item>
@@ -135,6 +136,46 @@
       </n-list>
     </n-drawer-content>
   </n-drawer>
+
+  <!-- 大模型抽屉 -->
+  <n-drawer v-model:show="showBigModel" style="width: 38.2%">
+    <n-drawer-content title="大模型">
+      <!-- 搜索框 -->
+      <n-input
+          v-model:value="bigModelInput"
+          placeholder="DSL语句写法大模型搜索，请输入问题"
+          clearable
+          style="margin-bottom: 12px"
+      >
+        <template #prefix>
+          <n-icon><SearchFilled /></n-icon>
+        </template>
+      </n-input>
+      <!-- 结果显示框 --> 
+      <n-scrollbar style="max-height: 72vh">
+        <n-card>
+          <n-space vertical>
+            <n-text style="white-space: pre-wrap; text-align: left">{{ bigModelResponse }}</n-text>
+            <n-divider />
+            <n-space justify="end">
+              <n-button type="primary" @click="sendBigModelQuery" :loading="bigModelLoading">
+                <template #icon>
+                  <n-icon><SendSharp /></n-icon>
+                </template>
+                发送
+              </n-button>
+              <n-button @click="clearBigModelResponse">
+                清空
+              </n-button>
+              <n-button @click="autofill">
+                自动填充
+              </n-button>
+            </n-space>
+          </n-space>
+        </n-card>
+      </n-scrollbar>
+    </n-drawer-content>
+  </n-drawer>
 </template>
 
 <script setup>
@@ -143,8 +184,8 @@ import {NButton, NGrid, NGridItem, NInput, NSelect, useMessage} from 'naive-ui'
 import {computed, onMounted, ref} from "vue";
 import JSONEditor from 'jsoneditor';
 import '../assets/css/jsoneditor.min.css'
-import {Search} from "../../wailsjs/go/service/ESService";
-import {ArrowDownwardOutlined, HistoryOutlined, MenuBookTwotone, SearchFilled, SendSharp} from "@vicons/material";
+import {Search,BigModelSearch} from "../../wailsjs/go/service/ESService";
+import {ArrowDownwardOutlined, HikingSharp, HistoryOutlined, MenuBookTwotone, SearchFilled, SendSharp} from "@vicons/material";
 import {formatTimestamp, renderIcon} from "../utils/common";
 import 'ace-builds/src-noconflict/theme-tomorrow_night';
 import 'ace-builds/src-noconflict/theme-monokai';
@@ -156,12 +197,15 @@ const message = useMessage()
 const method = ref('GET')
 const path = ref('')
 const searchText = ref('')
+const bigModelInput = ref('')
+const bigModelResponse = ref('')
 const history = ref([])
 const editor = ref();
 const response = ref()
 const send_loading = ref(false)
 const showDrawer = ref(false)
 const showHistoryDrawer = ref(false)
+const showBigModel = ref(false)
 // 状态管理
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -259,6 +303,57 @@ const formatDSL = (dsl) => {
     return dsl
   }
 }
+
+const sendBigModelQuery = async () => {
+  bigModelResponse.value = ''
+  try {
+    const res = await BigModelSearch(bigModelInput.value)
+    // bigModelResponse.value = res.result
+    // 返回不是200也写入结果框
+    if (res.err !== "") {
+      bigModelResponse.value = res.err
+    } else {
+      bigModelResponse.value = res.result.content
+    }
+  } catch (e) {
+    message.error(e)
+  }
+}
+
+const clearBigModelResponse = async () => {
+  bigModelResponse.value = ''
+}
+
+const autofill = async () => {
+  try {
+    // 解析大模型返回的内容
+    const content = bigModelResponse.value;
+    
+    // 提取请求路径
+    const pathMatch = content.match(/请求路径:\s*([^\n]+)/);
+    if (pathMatch) {
+      path.value = pathMatch[1].trim();
+    }
+
+    // 提取请求方式 
+    const methodMatch = content.match(/请求方式:\s*([^\n]+)/);
+    if (methodMatch) {
+      method.value = methodMatch[1].trim();
+    }
+
+    // 提取请求体
+    const bodyMatch = content.match(/请求体:\s*([\s\S]+)$/);
+    if (bodyMatch) {
+      // 处理换行符,将\n替换为真实换行
+      const body = bodyMatch[1].trim().replace(/\\n/g, '\n');
+      editor.value.set(formatDSL(body));
+    }
+  } catch (e) {
+    message.error('解析失败:' + e);
+  }
+
+}
+
 const sendRequest = async () => {
   send_loading.value = true
   // 清空response
